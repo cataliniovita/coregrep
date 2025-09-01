@@ -99,6 +99,8 @@ class FetchGithubRepos:
 
         total_count = int(data.get("total_count", 0))
 
+        print("[+] Total count search ", total_count)
+
         return total_count, headers
 
 
