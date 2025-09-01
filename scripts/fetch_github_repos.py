@@ -226,7 +226,6 @@ class FetchGithubRepos:
             current_min_exclusive = upper
 
 
-
     def normalize_repo_record(self, item: dict) -> dict:
         """Extract a stable subset of fields for output."""
         license_info = item.get("license") or {}
@@ -264,6 +263,21 @@ class FetchGithubRepos:
         self.write_jsonl(self.gen_records())
 
 
+    def sort_results(self):
+        # Sort the output file by stargazers_count descending
+        records = []
+        with open(self.out_path, "r", encoding="utf-8") as f:
+            for line in f:
+                rec = json.loads(line)
+                records.append(rec)
+
+        records.sort(key=lambda r: r.get("stargazers_count", 0), reverse=True)
+
+        with open(self.out_path, "w", encoding="utf-8") as f:
+            for rec in records:
+                f.write(json.dumps(rec, ensure_ascii=False) + "\n")
+
+
 def build_parser(argv: Optional[List[str]] = None):
     parser = argparse.ArgumentParser(description="Fetch GitHub repos with > N stars, overcoming the 1,000 search cap via star-range partitioning.")
     parser.add_argument("--min-stars", type=int, default=250, help="Minimum stars threshold (strictly greater than this)")
@@ -282,10 +296,11 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     FetchGithubRepository = FetchGithubRepos(args.token, args.max_repos, args.min_stars)
     FetchGithubRepository.generate_results()
+    FetchGithubRepository.sort_results()
 
     return 0
 
+
 if __name__ == "__main__":
     raise SystemExit(main())
-
 
