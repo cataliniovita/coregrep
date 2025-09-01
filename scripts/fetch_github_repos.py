@@ -195,13 +195,13 @@ class FetchGithubRepos:
         return best
 
 
-    def iter_all_repos_over_min_stars(self, min_stars: int, max_repos: Optional[int] = None) -> Iterator[dict]:
+    def iter_all_repos_over_min_stars(self) -> Iterator[dict]:
         """Iterate over all repositories with stargazers_count > min_stars.
 
         This partitions the search space by star count to avoid the 1,000 result cap.
         """
         global_max = self.find_global_max_stars()
-        current_min_exclusive = min_stars
+        current_min_exclusive = self.min_stars
         yielded = 0
         seen_repo_ids = set()
 
@@ -218,7 +218,7 @@ class FetchGithubRepos:
                 seen_repo_ids.add(repo_id)
                 yield item
                 yielded += 1
-                if max_repos is not None and yielded >= max_repos:
+                if self.max_repos is not None and yielded >= self.max_repos:
                     return
 
             current_min_exclusive = upper
@@ -247,10 +247,19 @@ class FetchGithubRepos:
         }
 
 
-    def write_jsonl(self, path: str, records: Iterable[dict]) -> None:
-        with open(path, "w", encoding="utf-8") as f:
+    def write_jsonl(self, records: Iterable[dict]) -> None:
+        with open(self.out_path, "w", encoding="utf-8") as f:
             for rec in records:
                 f.write(json.dumps(rec, ensure_ascii=False) + "\n")
+
+
+    def gen_records(self) -> Iterator[dict]:
+        for item in self.iter_all_repos_over_min_stars():
+            yield self.normalize_repo_record(item)
+
+
+    def generate_results(self):
+        self.write_jsonl(self.gen_records())
 
 
 def build_parser(argv: Optional[List[str]] = None):
@@ -265,16 +274,12 @@ def build_parser(argv: Optional[List[str]] = None):
 
     return args
 
+
 def main(argv: Optional[List[str]] = None) -> int:
     args = build_parser(argv)
 
-    token = args.token
-
-    def gen_records() -> Iterator[dict]:
-        for item in iter_all_repos_over_min_stars(args.min_stars, token, max_repos=args.max_repos):
-            yield normalize_repo_record(item)
-
-    write_jsonl(args.out, gen_records())
+    FetchGithubRepository = FetchGithubRepos(args.token, args.max_repos, args.min_stars)
+    FetchGithubRepository.generate_results()
 
     return 0
 
